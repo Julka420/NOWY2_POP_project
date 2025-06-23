@@ -141,3 +141,125 @@ def otworz_panel_osob(nazwa_typu, typ_klasy, baza_danych):
     Button(okno, text="Pokaż wszystkich na mapie", command=pokaz_na_mapie_wszystkich).pack(pady=4)
 
     odswiez()
+
+# === OPERACJE CENTRÓW ===
+def dodaj_centrum():
+    nazwa = entry_nazwa.get().strip()
+    if not nazwa:
+        return
+    centrum = CentrumHandlowe(nazwa)
+    centra.append(centrum)
+    centrum_pracownicy[nazwa] = []
+    centrum_klienci[nazwa] = []
+    pokaz_centra()
+    entry_nazwa.delete(0, END)
+    entry_nazwa.focus()
+
+def pokaz_centra():
+    listbox_centra.delete(0, END)
+    for i, centrum in enumerate(centra):
+        listbox_centra.insert(i, f"{i+1}. {centrum.nazwa}")
+
+def pokaz_na_mapie():
+    idx = listbox_centra.curselection()
+    if not idx:
+        return
+    centrum = centra[idx[0]]
+    map_widget.set_position(centrum.latitude, centrum.longitude)
+    map_widget.set_zoom(13)
+
+def pokaz_wszystkie_centra_na_mapie():
+    for c in centra:
+        if c.marker:
+            c.marker.delete()
+        c.marker = map_widget.set_marker(c.latitude, c.longitude, text=c.nazwa)
+    if centra:
+        lat = sum(c.latitude for c in centra) / len(centra)
+        lon = sum(c.longitude for c in centra) / len(centra)
+        map_widget.set_position(lat, lon)
+        map_widget.set_zoom(6)
+
+def pokaz_osoby_centrum(typ_osoby):
+    idx = listbox_centra.curselection()
+    if not idx:
+        return
+    centrum = centra[idx[0]]
+    nazwa = centrum.nazwa
+    dane = centrum_pracownicy if typ_osoby == "pracownik" else centrum_klienci
+    osoby = dane.get(nazwa, [])
+    for o in osoby:
+        if o.marker:
+            o.marker.delete()
+        o.marker = map_widget.set_marker(o.latitude, o.longitude, text=f"{o.imie_nazwisko}\n({o.miasto})")
+    if osoby:
+        lat = sum(o.latitude for o in osoby) / len(osoby)
+        lon = sum(o.longitude for o in osoby) / len(osoby)
+        map_widget.set_position(lat, lon)
+        map_widget.set_zoom(7)
+
+def usun_centrum():
+    idx = listbox_centra.curselection()
+    if not idx:
+        return
+    i = idx[0]
+    centrum = centra[i]
+    for p in centrum_pracownicy.get(centrum.nazwa, []):
+        if p.marker:
+            p.marker.delete()
+    for k in centrum_klienci.get(centrum.nazwa, []):
+        if k.marker:
+            k.marker.delete()
+    if centrum.marker:
+        centrum.marker.delete()
+    centra.pop(i)
+    centrum_pracownicy.pop(centrum.nazwa, None)
+    centrum_klienci.pop(centrum.nazwa, None)
+    pokaz_centra()
+
+def edytuj_centrum():
+    idx = listbox_centra.curselection()
+    if not idx:
+        return
+    i = idx[0]
+    entry_nazwa.delete(0, END)
+    entry_nazwa.insert(0, centra[i].nazwa)
+    button_dodaj.config(text="Zapisz", command=lambda: zapisz_edycje(i))
+
+def zapisz_edycje(i):
+    nowa_nazwa = entry_nazwa.get().strip()
+    if not nowa_nazwa:
+        return
+    stara_nazwa = centra[i].nazwa
+    if centra[i].marker:
+        centra[i].marker.delete()
+    centra[i] = CentrumHandlowe(nowa_nazwa)
+    centrum_pracownicy[nowa_nazwa] = centrum_pracownicy.pop(stara_nazwa, [])
+    centrum_klienci[nowa_nazwa] = centrum_klienci.pop(stara_nazwa, [])
+    pokaz_centra()
+    entry_nazwa.delete(0, END)
+    button_dodaj.config(text="Dodaj centrum", command=dodaj_centrum)
+
+# === GUI ===
+root = Tk()
+root.title("Centra Handlowe – Mapa i Zarządzanie")
+root.geometry("1200x700")
+
+ramka_lista = Frame(root)
+ramka_formularz = Frame(root)
+ramka_mapa = Frame(root)
+
+ramka_lista.pack(side=LEFT, padx=10, pady=10)
+ramka_formularz.pack(side=TOP, padx=10, pady=10)
+ramka_mapa.pack(side=BOTTOM, padx=10, pady=10, fill=BOTH, expand=True)
+
+Label(ramka_lista, text="Lista centrów handlowych").pack()
+listbox_centra = Listbox(ramka_lista, width=40, height=20)
+listbox_centra.pack()
+Button(ramka_lista, text="Pokaż centrum na mapie", command=pokaz_na_mapie).pack(pady=2)
+Button(ramka_lista, text="Pokaż wszystkie centra", command=pokaz_wszystkie_centra_na_mapie).pack(pady=2)
+Button(ramka_lista, text="Usuń centrum", command=usun_centrum).pack(pady=2)
+Button(ramka_lista, text="Edytuj centrum", command=edytuj_centrum).pack(pady=2)
+Button(ramka_lista, text="Pracownicy", command=lambda: otworz_panel_osob("Pracownicy", Pracownik, centrum_pracownicy)).pack(pady=5)
+Button(ramka_lista, text="Klienci", command=lambda: otworz_panel_osob("Klienci", Klient, centrum_klienci)).pack(pady=5)
+Button(ramka_lista, text="Pokaż pracowników wybranego", command=lambda: pokaz_osoby_centrum("pracownik")).pack(pady=2)
+Button(ramka_lista, text="Pokaż klientów wybranego", command=lambda: pokaz_osoby_centrum("klient")).pack(pady=2)
